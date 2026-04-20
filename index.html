@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>For You 💜</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&family=Great+Vibes&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#06020f;cursor:none}
+
+#cursor{position:fixed;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle,#f0e0ff,#c090f0);pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:screen;transition:width .12s,height .12s}
+#cursor-ring{position:fixed;width:34px;height:34px;border-radius:50%;border:1px solid rgba(200,150,255,.45);pointer-events:none;z-index:9998;transform:translate(-50%,-50%);mix-blend-mode:screen}
+
+canvas{position:fixed;inset:0;display:block}
+#bg-canvas{z-index:0}
+#petal-canvas{z-index:1;pointer-events:none}
+#bloom-canvas{z-index:2}
+#glow-canvas{z-index:3;pointer-events:none;mix-blend-mode:screen}
+
+#ui{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:9vh;pointer-events:none}
+
+#msg-outer{
+  text-align:center;opacity:0;transform:translateY(28px);
+  transition:opacity 2.4s cubic-bezier(.16,1,.3,1),transform 2.4s cubic-bezier(.16,1,.3,1);
+  pointer-events:none;
+}
+#msg-outer.visible{opacity:1;transform:translateY(0)}
+#msg-deco{font-family:'Great Vibes',cursive;font-size:clamp(.85rem,2.2vw,1.1rem);color:rgba(210,170,255,.5);letter-spacing:.18em;margin-bottom:10px}
+#msg-main{font-family:'Cormorant Garamond',Georgia,serif;font-size:clamp(1.1rem,3.2vw,1.7rem);font-weight:300;font-style:italic;color:rgba(240,220,255,.93);letter-spacing:.05em;line-height:1.75;text-shadow:0 0 60px rgba(180,100,255,.5),0 0 120px rgba(140,60,220,.25);max-width:520px;padding:0 20px}
+.hl{color:#f0d0ff;font-weight:400;text-shadow:0 0 24px rgba(230,160,255,1),0 0 60px rgba(180,100,255,.7)}
+
+#controls{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:12px;opacity:0;transition:opacity 1.5s ease;pointer-events:all}
+#controls.visible{opacity:1}
+.ctrl-btn{background:rgba(90,40,140,.4);border:1px solid rgba(200,150,255,.35);color:rgba(235,215,255,.9);font-family:'Cormorant Garamond',serif;font-size:.82rem;letter-spacing:.13em;padding:9px 22px;border-radius:40px;cursor:none;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transition:background .3s,border-color .3s,box-shadow .3s;white-space:nowrap}
+.ctrl-btn:hover{background:rgba(130,60,190,.6);border-color:rgba(220,180,255,.65);box-shadow:0 0 28px rgba(170,100,240,.45)}
+#orb{width:44px;height:44px;border-radius:50%;background:rgba(100,50,160,.45);border:1px solid rgba(200,150,255,.4);color:rgba(235,215,255,.9);font-size:1rem;display:flex;align-items:center;justify-content:center;cursor:none;backdrop-filter:blur(16px);transition:all .3s}
+#orb.on{box-shadow:0 0 20px rgba(180,110,255,.7),0 0 40px rgba(140,70,220,.35);border-color:rgba(220,180,255,.7)}
+
+#hint{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:.78rem;letter-spacing:.15em;color:rgba(200,160,255,.38);z-index:20;opacity:0;transition:opacity 2s;pointer-events:none}
+#hint.visible{opacity:1}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<canvas id="bg-canvas"></canvas>
+<canvas id="petal-canvas"></canvas>
+<canvas id="bloom-canvas"></canvas>
+<canvas id="glow-canvas"></canvas>
+
+<div id="ui">
+  <div id="msg-outer">
+    <!-- <div id="msg-deco">with all the love in this garden</div> -->  
+    <p id="msg-main">I hope today treats you as <span class="hl">gently</span><br>as your <span class="hl">smile</span> does.</p>
+  </div>
+</div>
+
+<div id="hint">✦ click the flowers ✦</div>
+
+<div id="controls">
+  <button class="ctrl-btn" id="play-btn">♪ Tap to Play Music</button>
+  <div id="orb">▶</div>
+</div>
+
+<audio id="music" loop preload="auto">
+  <source src="Please.mp3" type="audio/mpeg"/>
+</audio>
+
+<script>
+"use strict";
+// ─── CONSTANTS ────────────────────────────────────────────────
+const PI=Math.PI,TAU=PI*2;
+const rnd=(a,b)=>Math.random()*(b-a)+a;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+
+// ─── CANVAS SETUP ─────────────────────────────────────────────
+const bgC=document.getElementById('bg-canvas');
+const petC=document.getElementById('petal-canvas');
+const blC=document.getElementById('bloom-canvas');
+const glC=document.getElementById('glow-canvas');
+const bgX=bgC.getContext('2d');
+const petX=petC.getContext('2d');
+const blX=blC.getContext('2d');
+const glX=glC.getContext('2d');
+let W=0,H=0;
+
+function resize(){
+  W=window.innerWidth; H=window.innerHeight;
+  [bgC,petC,blC,glC].forEach(c=>{c.width=W;c.height=H;});
+}
+window.addEventListener('resize',()=>{resize();drawBG();flowers=buildFlowers();});
+resize();
+
+// ─── BACKGROUND ───────────────────────────────────────────────
+function drawBG(){
+  bgX.fillStyle='#06020f';bgX.fillRect(0,0,W,H);
+  // Nebula clouds
+  [[.15,.35,260,.14,'#3b1070'],[.85,.25,200,.12,'#1a0850'],[.5,.65,300,.1,'#2d0a6a'],[.3,.8,170,.09,'#4a1080']].forEach(([fx,fy,r,a,col])=>{
+    const g=bgX.createRadialGradient(fx*W,fy*H,0,fx*W,fy*H,r);
+    g.addColorStop(0,col);g.addColorStop(1,'transparent');
+    bgX.save();bgX.globalAlpha=a;bgX.beginPath();bgX.arc(fx*W,fy*H,r,0,TAU);bgX.fillStyle=g;bgX.fill();bgX.restore();
+  });
+  // Stars
+  for(let i=0;i<280;i++){
+    const x=rnd(0,W),y=rnd(0,H),r=rnd(.3,1.6);
+    bgX.beginPath();bgX.arc(x,y,r,0,TAU);
+    bgX.fillStyle=`rgba(220,200,255,${rnd(.08,.65)})`;bgX.fill();
+  }
+}
+drawBG();
+
+// ─── FALLING PETALS (permanent canvas objects) ────────────────
+class FallingPetal{
+  constructor(burst,cx,cy){
+    this.burst=!!burst;
+    if(burst){
+      this.x=cx+rnd(-20,20);this.y=cy+rnd(-20,20);
+      this.vx=rnd(-5,5);this.vy=rnd(-8,-1);
+      this.maxLife=rnd(2,4);
+    } else {
+      this.x=rnd(-40,W+40);this.y=rnd(-60,-5);
+      this.vx=rnd(-1.2,1.2);this.vy=rnd(.4,1.2);
+      this.maxLife=rnd(10,24);
+    }
+    this.rot=rnd(0,TAU);this.rotV=rnd(-.045,.045);
+    this.w=rnd(9,22);this.h=rnd(5,13);
+    this.swingAmp=rnd(.6,1.4);this.swingFreq=rnd(.012,.025);this.swingOff=rnd(0,TAU);
+    this.t=0;
+    const cols=['#d4a8f0','#f0b8d8','#e8a0c8','#c890e8','#f4c8e8','#b8a0e0','#fce0ff','#e0c8ff','#ffd8f0'];
+    this.color=cols[Math.floor(rnd(0,cols.length))];
+  }
+  update(dt){
+    this.t+=dt;
+    this.x+=this.vx+Math.sin(this.t*this.swingFreq*60+this.swingOff)*this.swingAmp;
+    this.y+=this.vy;
+    this.rot+=this.rotV;
+    if(this.burst)this.vy+=.1;
+    return this.t<this.maxLife&&this.y<H+60;
+  }
+  get alpha(){
+    if(this.burst)return clamp(1-this.t/this.maxLife,0,1)*.9;
+    return .8*Math.min(1,this.t/.8)*Math.min(1,(this.maxLife-this.t)/1.5);
+  }
+  draw(ctx){
+    const a=this.alpha;
+    if(a<.01)return;
+    ctx.save();
+    ctx.globalAlpha=a;
+    ctx.translate(this.x,this.y);ctx.rotate(this.rot);
+    ctx.beginPath();
+    ctx.moveTo(0,-this.h);
+    ctx.bezierCurveTo(this.w*.65,-this.h*.6,this.w*.85,this.h*.3,0,this.h);
+    ctx.bezierCurveTo(-this.w*.85,this.h*.3,-this.w*.65,-this.h*.6,0,-this.h);
+    ctx.fillStyle=this.color;
+    ctx.shadowColor=this.color;ctx.shadowBlur=7;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+const petals=[];
+let lastSpawn=0;
+for(let i=0;i<60;i++){
+  const p=new FallingPetal(false);
+  p.y=rnd(0,H);p.t=rnd(0,p.maxLife*.65);
+  petals.push(p);
+}
+function burstPetals(cx,cy){for(let i=0;i<30;i++)petals.push(new FallingPetal(true,cx,cy));}
+
+// ─── SPARKLES ─────────────────────────────────────────────────
+class Sparkle{
+  constructor(){this.reset(true);}
+  reset(init){
+    this.x=rnd(0,W);this.y=init?rnd(0,H):rnd(H*.05,H*.9);
+    this.r=rnd(.4,3);
+    this.vx=(Math.random()-.5)*.28;this.vy=-rnd(.1,.52);
+    this.life=0;this.maxLife=rnd(4,15);
+    this.phase=rnd(0,TAU);
+    const cols=['#d4a8f0','#f0c4d8','#e8b8ff','#c8a0e8','#fce4ff','#b8d0ff','#ffe8f8'];
+    this.color=cols[Math.floor(rnd(0,cols.length))];
+  }
+  update(dt){
+    this.life+=dt;this.x+=this.vx;this.y+=this.vy;
+    if(this.life>this.maxLife||this.y<-10)this.reset(false);
+  }
+  draw(ctx){
+    const prog=this.life/this.maxLife;
+    const a=clamp(Math.sin(prog*PI)*(.5+.4*Math.sin(this.life*3+this.phase)),0,1);
+    ctx.save();ctx.globalAlpha=a;
+    if(this.r>1.7){
+      ctx.save();ctx.translate(this.x,this.y);ctx.rotate(this.life*.7+this.phase);
+      ctx.beginPath();
+      for(let k=0;k<4;k++){
+        const ang=k*PI/2;
+        const ox=Math.cos(ang)*this.r*2.7,oy=Math.sin(ang)*this.r*2.7;
+        const ix=Math.cos(ang+PI/4)*this.r*.65,iy=Math.sin(ang+PI/4)*this.r*.65;
+        k===0?ctx.moveTo(ox,oy):ctx.lineTo(ox,oy);ctx.lineTo(ix,iy);
+      }
+      ctx.closePath();
+      ctx.fillStyle=this.color;ctx.shadowColor=this.color;ctx.shadowBlur=9;ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,TAU);
+      ctx.fillStyle=this.color;ctx.shadowColor=this.color;ctx.shadowBlur=6;ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+const sparkles=[];for(let i=0;i<170;i++)sparkles.push(new Sparkle());
+
+// ─── GLOW ORBS ────────────────────────────────────────────────
+class GlowOrb{
+  constructor(){this.reset();}
+  reset(){
+    this.x=rnd(W*.05,W*.95);this.y=rnd(H*.05,H*.9);
+    this.r=rnd(35,115);this.baseAlpha=rnd(.025,.08);
+    this.pulse=rnd(0,TAU);this.pulseSpeed=rnd(.003,.01);
+    this.dx=(Math.random()-.5)*.1;this.dy=(Math.random()-.5)*.07;
+    const hs=[265,280,300,315,255];this.hue=hs[Math.floor(rnd(0,hs.length))];
+  }
+  update(){
+    this.pulse+=this.pulseSpeed;this.x+=this.dx;this.y+=this.dy;
+    if(this.x<-this.r||this.x>W+this.r||this.y<-this.r||this.y>H+this.r)this.reset();
+  }
+  draw(ctx){
+    const a=this.baseAlpha*(1+.35*Math.sin(this.pulse));
+    const g=ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,this.r);
+    g.addColorStop(0,`hsla(${this.hue},80%,72%,${a*2.5})`);g.addColorStop(1,`hsla(${this.hue},70%,60%,0)`);
+    ctx.save();ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,TAU);ctx.fillStyle=g;ctx.fill();ctx.restore();
+  }
+}
+const glowOrbs=[];for(let i=0;i<20;i++)glowOrbs.push(new GlowOrb());
+
+// ─── BEZIER HELPERS ───────────────────────────────────────────
+function cubicBez(p0,p1,p2,p3,t){const m=1-t;return m*m*m*p0+3*m*m*t*p1+3*m*t*t*p2+t*t*t*p3;}
+
+function drawStem(ctx,x1,y1,x2,y2,cpx1,cpy1,cpx2,cpy2,progress,lw){
+  if(progress<=0)return;
+  const steps=60,cut=Math.round(progress*steps);
+  if(cut<1)return;
+  ctx.save();
+  ctx.strokeStyle='rgba(100,158,88,.88)';ctx.lineWidth=lw;ctx.lineCap='round';
+  ctx.shadowColor='rgba(80,140,70,.35)';ctx.shadowBlur=4;
+  ctx.beginPath();
+  for(let i=0;i<=cut;i++){
+    const tt=i/steps;
+    const bx=cubicBez(x1,cpx1,cpx2,x2,tt);const by=cubicBez(y1,cpy1,cpy2,y2,tt);
+    i===0?ctx.moveTo(bx,by):ctx.lineTo(bx,by);
+  }
+  ctx.stroke();ctx.restore();
+}
+
+function drawLeaf(ctx,x,y,angle,size,progress){
+  if(progress<=0)return;
+  const p=clamp(progress,0,1);
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  ctx.scale(p,p);
+  const lg=ctx.createLinearGradient(0,-size*.15,size*.95,size*.1);
+  lg.addColorStop(0,'rgba(88,148,82,.92)');lg.addColorStop(.55,'rgba(110,168,98,.95)');lg.addColorStop(1,'rgba(78,138,72,.72)');
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.bezierCurveTo(size*.25,-size*.42,size*.88,-size*.28,size,0);
+  ctx.bezierCurveTo(size*.88,size*.28,size*.25,size*.38,0,0);
+  ctx.fillStyle=lg;ctx.shadowColor='rgba(100,160,90,.35)';ctx.shadowBlur=5;ctx.fill();
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(size*.88,0);
+  ctx.strokeStyle='rgba(68,118,62,.45)';ctx.lineWidth=.7;ctx.stroke();
+  ctx.restore();
+}
+
+// ─── PROCEDURAL FLOWER ────────────────────────────────────────
+class Flower{
+  constructor(cfg){
+    Object.assign(this,{x:0,y:0,scale:1,petalCount:6,petalLayers:2,hue:280,satLo:55,satHi:80,petalW:1,petalH:1.85,bloomDelay:0,bloomDur:2.2,breatheAmp:.025,breatheSpeed:.65,glowH:280},cfg);
+    this.t=0;this.bloom=0;this.bloomEased=0;this.bloomed=false;this.hoverVal=0;this._hovered=false;
+  }
+  _easeElastic(t){
+    if(t<=0)return 0;if(t>=1)return 1;
+    return Math.pow(2,-9*t)*Math.sin((t*10-.75)*(TAU/3))+1;
+  }
+  update(dt,gt){
+    this.t=gt;
+    const elapsed=gt-this.bloomDelay;
+    this.bloom=clamp(elapsed/this.bloomDur,0,1);
+    this.bloomEased=this._easeElastic(this.bloom);
+    if(this.bloom>=1&&!this.bloomed)this.bloomed=true;
+    this.hoverVal=lerp(this.hoverVal,this._hovered?1:0,.09);
+  }
+  draw(ctx){
+    if(this.bloomEased<=0.005)return;
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    const breathe=this.bloomed?(1+Math.sin(this.t*this.breatheSpeed)*this.breatheAmp):1;
+    const sc=this.scale*this.bloomEased*breathe*(1+this.hoverVal*.06);
+    ctx.scale(sc,sc);
+
+    // Under-glow
+    const gr=55+this.hoverVal*28;
+    const gg=ctx.createRadialGradient(0,0,0,0,0,gr);
+    gg.addColorStop(0,`hsla(${this.glowH},75%,68%,${.28+this.hoverVal*.18})`);
+    gg.addColorStop(1,`hsla(${this.glowH},70%,60%,0)`);
+    ctx.beginPath();ctx.arc(0,0,gr,0,TAU);ctx.fillStyle=gg;ctx.fill();
+
+    // Petals: outer layers first
+    for(let layer=this.petalLayers-1;layer>=0;layer--){
+      const lScale=1-layer*.2;
+      const pw=this.petalW*27*lScale;
+      const ph=this.petalH*34*lScale;
+      const sat=lerp(this.satLo,this.satHi,layer/Math.max(1,this.petalLayers-1));
+      const lit=54+layer*11;
+      const rotOff=layer*(PI/this.petalCount)*.9;
+      for(let i=0;i<this.petalCount;i++){
+        const ang=(TAU/this.petalCount)*i+rotOff;
+        const hShift=this.hue+i*2.5-layer*7;
+        const alpha=.84-layer*.06;
+        ctx.save();ctx.rotate(ang);
+        // organic teardrop petal
+        const g=ctx.createLinearGradient(0,0,0,-ph);
+        g.addColorStop(0,`hsla(${hShift},${sat}%,${lit-9}%,${alpha*.9})`);
+        g.addColorStop(.45,`hsla(${hShift+7},${sat+7}%,${lit+10}%,${alpha})`);
+        g.addColorStop(1,`hsla(${hShift+14},${sat+4}%,${lit+20}%,${alpha*.65})`);
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.bezierCurveTo(pw*.7,-ph*.3,pw*.55,-ph*.82,0,-ph);
+        ctx.bezierCurveTo(-pw*.55,-ph*.82,-pw*.7,-ph*.3,0,0);
+        ctx.closePath();
+        ctx.fillStyle=g;
+        ctx.shadowColor=`hsla(${this.hue},72%,68%,.55)`;
+        ctx.shadowBlur=10+this.hoverVal*14;
+        ctx.fill();
+        ctx.strokeStyle=`hsla(${hShift+12},${sat}%,${lit+22}%,.22)`;ctx.lineWidth=.5;ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // Center disc
+    const cg=ctx.createRadialGradient(0,0,0,0,0,11);
+    cg.addColorStop(0,'#fff0fa');cg.addColorStop(.5,'#f5d0ec');cg.addColorStop(1,`hsla(${this.hue},60%,56%,1)`);
+    ctx.beginPath();ctx.arc(0,0,11,0,TAU);ctx.fillStyle=cg;ctx.shadowColor='rgba(255,220,255,.9)';ctx.shadowBlur=14;ctx.fill();
+
+    // Pollen
+    for(let p=0;p<6;p++){
+      const pa=TAU/6*p+this.t*.28;const pd=7.5;
+      ctx.beginPath();ctx.arc(Math.cos(pa)*pd,Math.sin(pa)*pd,1.9,0,TAU);
+      ctx.fillStyle='rgba(255,242,155,.95)';ctx.shadowBlur=4;ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// ─── RIBBON ───────────────────────────────────────────────────
+function drawRibbon(ctx,prog){
+  if(prog<=0)return;
+  const cx=W*.5,by=H*.73;
+  ctx.save();ctx.globalAlpha=prog;
+  const wg=ctx.createLinearGradient(cx-80,by,cx+80,by+80);
+  wg.addColorStop(0,'rgba(155,105,215,.55)');wg.addColorStop(.5,'rgba(185,138,245,.7)');wg.addColorStop(1,'rgba(145,98,208,.5)');
+  ctx.beginPath();ctx.moveTo(cx-80,by);ctx.lineTo(cx-52,by+80);ctx.lineTo(cx+52,by+80);ctx.lineTo(cx+80,by);ctx.closePath();
+  ctx.fillStyle=wg;ctx.fill();
+  // Bow left
+  ctx.beginPath();ctx.moveTo(cx,by+6);ctx.bezierCurveTo(cx-18,by-22,cx-68,by-18,cx-54,by+4);ctx.bezierCurveTo(cx-42,by+18,cx-6,by+12,cx,by+6);
+  ctx.fillStyle='rgba(208,168,252,.82)';ctx.shadowColor='rgba(190,145,255,.4)';ctx.shadowBlur=8;ctx.fill();
+  // Bow right
+  ctx.beginPath();ctx.moveTo(cx,by+6);ctx.bezierCurveTo(cx+18,by-22,cx+68,by-18,cx+54,by+4);ctx.bezierCurveTo(cx+42,by+18,cx+6,by+12,cx,by+6);
+  ctx.fillStyle='rgba(208,168,252,.82)';ctx.fill();
+  // Knot
+  ctx.beginPath();ctx.ellipse(cx,by+6,11,8,0,0,TAU);ctx.fillStyle='rgba(235,212,255,.96)';ctx.shadowColor='rgba(200,162,255,.7)';ctx.shadowBlur=10;ctx.fill();
+  ctx.restore();
+}
+
+// ─── FLOWER CONFIG ────────────────────────────────────────────
+let flowers=[];
+function buildFlowers(){
+  const cx=W*.5,cy=H*.42;
+  const defs=[
+    {x:cx,   y:cy,    scale:1.26,petalCount:7,petalLayers:3,hue:280,satLo:55,satHi:78,petalW:1.1,petalH:2.0,bloomDelay:.35,bloomDur:2.6,breatheAmp:.028,breatheSpeed:.5,glowH:280},
+    {x:cx-86,y:cy-46, scale:.96, petalCount:6,petalLayers:2,hue:330,satLo:54,satHi:74,petalW:1.0,petalH:1.9,bloomDelay:.9, bloomDur:2.2,breatheAmp:.026,breatheSpeed:.6,glowH:330},
+    {x:cx+90,y:cy-42, scale:.93, petalCount:8,petalLayers:2,hue:262,satLo:50,satHi:72,petalW:.96,petalH:1.85,bloomDelay:1.3,bloomDur:2.0,breatheAmp:.022,breatheSpeed:.65,glowH:262},
+    {x:cx-158,y:cy+10,scale:.73, petalCount:5,petalLayers:2,hue:345,satLo:48,satHi:67,petalW:.9,petalH:1.75,bloomDelay:1.7,bloomDur:1.9,breatheAmp:.03,breatheSpeed:.72,glowH:345},
+    {x:cx+158,y:cy+8, scale:.71, petalCount:6,petalLayers:2,hue:295,satLo:48,satHi:70,petalW:.88,petalH:1.72,bloomDelay:2.0,bloomDur:1.9,breatheAmp:.028,breatheSpeed:.7,glowH:295},
+    {x:cx-216,y:cy+44,scale:.56, petalCount:5,petalLayers:1,hue:320,satLo:45,satHi:64,petalW:.85,petalH:1.65,bloomDelay:2.3,bloomDur:1.7,breatheAmp:.032,breatheSpeed:.8,glowH:320},
+    {x:cx+212,y:cy+42,scale:.55, petalCount:5,petalLayers:1,hue:270,satLo:44,satHi:62,petalW:.84,petalH:1.65,bloomDelay:2.5,bloomDur:1.7,breatheAmp:.033,breatheSpeed:.78,glowH:270},
+  ];
+  return defs.map(cfg=>new Flower(cfg));
+}
+flowers=buildFlowers();
+
+// ─── STEMS & LEAVES DATA ──────────────────────────────────────
+function getStemData(){
+  const cx=W*.5,bot=H*.73;
+  return[
+    {x1:cx,y1:bot,x2:cx,   y2:H*.42,    cpx1:cx-10,cpy1:H*.62,cpx2:cx+8, cpy2:H*.52,lw:3.5},
+    {x1:cx,y1:bot,x2:cx-86,y2:H*.42-.046*H,cpx1:cx-28,cpy1:H*.6,cpx2:cx-66,cpy2:H*.5,lw:2.9},
+    {x1:cx,y1:bot,x2:cx+90,y2:H*.42-.041*H,cpx1:cx+30,cpy1:H*.6,cpx2:cx+70,cpy2:H*.5,lw:2.9},
+    {x1:cx,y1:bot,x2:cx-158,y2:H*.42+.01*H, cpx1:cx-52,cpy1:H*.63,cpx2:cx-128,cpy2:H*.53,lw:2.3},
+    {x1:cx,y1:bot,x2:cx+158,y2:H*.42+.008*H,cpx1:cx+54,cpy1:H*.63,cpx2:cx+128,cpy2:H*.53,lw:2.3},
+    {x1:cx,y1:bot,x2:cx-216,y2:H*.42+.044*H,cpx1:cx-78,cpy1:H*.65,cpx2:cx-188,cpy2:H*.56,lw:1.9},
+    {x1:cx,y1:bot,x2:cx+212,y2:H*.42+.042*H,cpx1:cx+78,cpy1:H*.65,cpx2:cx+186,cpy2:H*.56,lw:1.9},
+  ];
+}
+function getLeafData(){
+  const cx=W*.5,bot=H*.73;
+  return[
+    {x:cx-30,y:bot-H*.1, angle:-PI*.36,size:34},
+    {x:cx+24,y:bot-H*.09,angle:PI*.31,size:30},
+    {x:cx-20,y:bot-H*.17,angle:-PI*.26,size:26},
+    {x:cx+32,y:bot-H*.18,angle:PI*.21,size:22},
+    {x:cx-52,y:bot-H*.21,angle:-PI*.41,size:19},
+  ];
+}
+
+// ─── MOUSE / CLICK ────────────────────────────────────────────
+let mx=W/2,my=H/2,rx=W/2,ry=H/2;
+const cursorEl=document.getElementById('cursor');
+const cursorRing=document.getElementById('cursor-ring');
+
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX;my=e.clientY;
+  cursorEl.style.left=mx+'px';cursorEl.style.top=my+'px';
+  flowers.forEach(f=>{
+    const d=Math.hypot(mx-f.x,my-f.y);
+    f._hovered=d<56*f.scale;
+  });
+});
+document.addEventListener('click',e=>{
+  const px=e.clientX,py=e.clientY;
+  let hit=false;
+  flowers.forEach(f=>{if(Math.hypot(px-f.x,py-f.y)<60*f.scale&&f.bloom>.5){hit=true;burstPetals(f.x,f.y);}});
+  if(!hit)burstPetals(px,py);
+});
+
+// ─── MAIN LOOP ────────────────────────────────────────────────
+let startT=null,lastT=0,lastPetalTime=0;
+let msgShown=false,hintShown=false,ctrlShown=false;
+
+function frame(ts){
+  if(!startT)startT=ts;
+  const gt=(ts-startT)/1000;
+  const dt=clamp((ts-lastT)/1000,0,.05);lastT=ts;
+
+  // Petal canvas
+  petX.clearRect(0,0,W,H);
+  if(gt>lastPetalTime+.38&&petals.length<130){lastPetalTime=gt;petals.push(new FallingPetal(false));}
+  for(let i=petals.length-1;i>=0;i--){if(!petals[i].update(dt))petals.splice(i,1);else petals[i].draw(petX);}
+
+  // Glow canvas
+  glX.clearRect(0,0,W,H);
+  sparkles.forEach(s=>{s.update(dt);s.draw(glX);});
+  glowOrbs.forEach(o=>{o.update();o.draw(glX);});
+
+  // Bloom canvas
+  blX.clearRect(0,0,W,H);
+  const stemProg=clamp(gt-.18,0,1);
+  getStemData().forEach((s,i)=>{const p=clamp((stemProg-.04*i)*1.25,0,1);drawStem(blX,s.x1,s.y1,s.x2,s.y2,s.cpx1,s.cpy1,s.cpx2,s.cpy2,p,s.lw);});
+  const leafProg=clamp((gt-.7)*.95,0,1);
+  getLeafData().forEach((l,i)=>{const p=clamp((leafProg-.1*i)*2.2,0,1);drawLeaf(blX,l.x,l.y,l.angle,l.size,p);});
+  const ribbonProg=clamp((gt-2.5)*1.6,0,1);
+  drawRibbon(blX,ribbonProg);
+  flowers.forEach(f=>{f.update(dt,gt);f.draw(blX);});
+
+  // UI
+  if(gt>3.8&&!msgShown){msgShown=true;document.getElementById('msg-outer').classList.add('visible');}
+  if(gt>4.5&&!hintShown){hintShown=true;document.getElementById('hint').classList.add('visible');}
+  if(gt>4.1&&!ctrlShown){ctrlShown=true;document.getElementById('controls').classList.add('visible');}
+
+  // Cursor ring lag
+  rx=lerp(rx,mx,.13);ry=lerp(ry,my,.13);
+  cursorRing.style.left=rx+'px';cursorRing.style.top=ry+'px';
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ─── MUSIC ────────────────────────────────────────────────────
+const audio=document.getElementById('music');
+const playBtn=document.getElementById('play-btn');
+const orb=document.getElementById('orb');
+audio.volume=.38;
+function setPlaying(on){
+  if(on){orb.textContent='❚❚';orb.classList.add('on');playBtn.textContent='♫ Playing…';}
+  else{orb.textContent='▶';orb.classList.remove('on');playBtn.textContent='♪ Tap to Play Music';}
+}
+function toggleAudio(){if(audio.paused)audio.play().then(()=>setPlaying(true)).catch(()=>{});else{audio.pause();setPlaying(false);}}
+playBtn.addEventListener('click',toggleAudio);
+orb.addEventListener('click',toggleAudio);
+setTimeout(()=>audio.play().then(()=>setPlaying(true)).catch(()=>{}),900);
+</script>
+</body>
+</html>
