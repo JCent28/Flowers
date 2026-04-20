@@ -27,17 +27,17 @@ canvas{position:fixed;inset:0;display:block}
 }
 #msg-outer.visible{opacity:1;transform:translateY(0)}
 #msg-deco{font-family:'Great Vibes',cursive;font-size:clamp(.85rem,2.2vw,1.1rem);color:rgba(210,170,255,.5);letter-spacing:.18em;margin-bottom:10px}
-#msg-main{font-family:'Cormorant Garamond',Georgia,serif;font-size:clamp(1.1rem,3.2vw,1.7rem);font-weight:300;font-style:italic;color:rgba(240,220,255,.93);letter-spacing:.05em;line-height:1.75;text-shadow:0 0 60px rgba(180,100,255,.5),0 0 120px rgba(140,60,220,.25);max-width:520px;padding:0 20px}
+#msg-main{font-family:'Cormorant Garamond',Georgia,serif;font-size:clamp(1rem,3.2vw,1.7rem);font-weight:300;font-style:italic;color:rgba(240,220,255,.93);letter-spacing:.05em;line-height:1.75;text-shadow:0 0 60px rgba(180,100,255,.5),0 0 120px rgba(140,60,220,.25);max-width:min(520px,88vw);padding:0 20px}
 .hl{color:#f0d0ff;font-weight:400;text-shadow:0 0 24px rgba(230,160,255,1),0 0 60px rgba(180,100,255,.7)}
 
-#controls{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:12px;opacity:0;transition:opacity 1.5s ease;pointer-events:all}
+#controls{position:fixed;bottom:clamp(14px,3.5vh,28px);left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:clamp(6px,1.5vw,12px);opacity:0;transition:opacity 1.5s ease;pointer-events:all}
 #controls.visible{opacity:1}
-.ctrl-btn{background:rgba(90,40,140,.4);border:1px solid rgba(200,150,255,.35);color:rgba(235,215,255,.9);font-family:'Cormorant Garamond',serif;font-size:.82rem;letter-spacing:.13em;padding:9px 22px;border-radius:40px;cursor:none;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transition:background .3s,border-color .3s,box-shadow .3s;white-space:nowrap}
+.ctrl-btn{background:rgba(90,40,140,.4);border:1px solid rgba(200,150,255,.35);color:rgba(235,215,255,.9);font-family:'Cormorant Garamond',serif;font-size:clamp(.68rem,.9vw+.35rem,.82rem);letter-spacing:.13em;padding:clamp(6px,1.2vh,9px) clamp(12px,2vw,22px);border-radius:40px;cursor:none;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transition:background .3s,border-color .3s,box-shadow .3s;white-space:nowrap}
 .ctrl-btn:hover{background:rgba(130,60,190,.6);border-color:rgba(220,180,255,.65);box-shadow:0 0 28px rgba(170,100,240,.45)}
-#orb{width:44px;height:44px;border-radius:50%;background:rgba(100,50,160,.45);border:1px solid rgba(200,150,255,.4);color:rgba(235,215,255,.9);font-size:1rem;display:flex;align-items:center;justify-content:center;cursor:none;backdrop-filter:blur(16px);transition:all .3s}
+#orb{width:clamp(32px,5.5vmin,44px);height:clamp(32px,5.5vmin,44px);border-radius:50%;background:rgba(100,50,160,.45);border:1px solid rgba(200,150,255,.4);color:rgba(235,215,255,.9);font-size:clamp(.75rem,1.5vmin,1rem);display:flex;align-items:center;justify-content:center;cursor:none;backdrop-filter:blur(16px);transition:all .3s}
 #orb.on{box-shadow:0 0 20px rgba(180,110,255,.7),0 0 40px rgba(140,70,220,.35);border-color:rgba(220,180,255,.7)}
 
-#hint{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:.78rem;letter-spacing:.15em;color:rgba(200,160,255,.38);z-index:20;opacity:0;transition:opacity 2s;pointer-events:none}
+#hint{position:fixed;bottom:clamp(58px,9vh,80px);left:50%;transform:translateX(-50%);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:clamp(.64rem,.78vw+.2rem,.78rem);letter-spacing:.15em;color:rgba(200,160,255,.38);z-index:20;opacity:0;transition:opacity 2s;pointer-events:none;white-space:nowrap}
 #hint.visible{opacity:1}
 </style>
 </head>
@@ -52,7 +52,6 @@ canvas{position:fixed;inset:0;display:block}
 
 <div id="ui">
   <div id="msg-outer">
-    <!-- <div id="msg-deco">with all the love in this garden</div> -->  
     <p id="msg-main">I hope today treats you as <span class="hl">gently</span><br>as your <span class="hl">smile</span> does.</p>
   </div>
 </div>
@@ -70,13 +69,11 @@ canvas{position:fixed;inset:0;display:block}
 
 <script>
 "use strict";
-// ─── CONSTANTS ────────────────────────────────────────────────
 const PI=Math.PI,TAU=PI*2;
 const rnd=(a,b)=>Math.random()*(b-a)+a;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 
-// ─── CANVAS SETUP ─────────────────────────────────────────────
 const bgC=document.getElementById('bg-canvas');
 const petC=document.getElementById('petal-canvas');
 const blC=document.getElementById('bloom-canvas');
@@ -85,25 +82,31 @@ const bgX=bgC.getContext('2d');
 const petX=petC.getContext('2d');
 const blX=blC.getContext('2d');
 const glX=glC.getContext('2d');
-let W=0,H=0;
+
+let W=0,H=0,S=1; // S = vmin-based scale factor
+
+function getS(){ return Math.min(W,H)/600; }
 
 function resize(){
   W=window.innerWidth; H=window.innerHeight;
+  S=getS();
   [bgC,petC,blC,glC].forEach(c=>{c.width=W;c.height=H;});
 }
-window.addEventListener('resize',()=>{resize();drawBG();flowers=buildFlowers();});
+window.addEventListener('resize',()=>{
+  resize();
+  drawBG();
+  flowers=buildFlowers();
+});
 resize();
 
 // ─── BACKGROUND ───────────────────────────────────────────────
 function drawBG(){
   bgX.fillStyle='#06020f';bgX.fillRect(0,0,W,H);
-  // Nebula clouds
-  [[.15,.35,260,.14,'#3b1070'],[.85,.25,200,.12,'#1a0850'],[.5,.65,300,.1,'#2d0a6a'],[.3,.8,170,.09,'#4a1080']].forEach(([fx,fy,r,a,col])=>{
+  [[.15,.35,260*S,.14,'#3b1070'],[.85,.25,200*S,.12,'#1a0850'],[.5,.65,300*S,.1,'#2d0a6a'],[.3,.8,170*S,.09,'#4a1080']].forEach(([fx,fy,r,a,col])=>{
     const g=bgX.createRadialGradient(fx*W,fy*H,0,fx*W,fy*H,r);
     g.addColorStop(0,col);g.addColorStop(1,'transparent');
     bgX.save();bgX.globalAlpha=a;bgX.beginPath();bgX.arc(fx*W,fy*H,r,0,TAU);bgX.fillStyle=g;bgX.fill();bgX.restore();
   });
-  // Stars
   for(let i=0;i<280;i++){
     const x=rnd(0,W),y=rnd(0,H),r=rnd(.3,1.6);
     bgX.beginPath();bgX.arc(x,y,r,0,TAU);
@@ -112,22 +115,22 @@ function drawBG(){
 }
 drawBG();
 
-// ─── FALLING PETALS (permanent canvas objects) ────────────────
+// ─── FALLING PETALS ───────────────────────────────────────────
 class FallingPetal{
   constructor(burst,cx,cy){
     this.burst=!!burst;
     if(burst){
       this.x=cx+rnd(-20,20);this.y=cy+rnd(-20,20);
-      this.vx=rnd(-5,5);this.vy=rnd(-8,-1);
+      this.vx=rnd(-5,5)*S;this.vy=rnd(-8,-1)*S;
       this.maxLife=rnd(2,4);
     } else {
       this.x=rnd(-40,W+40);this.y=rnd(-60,-5);
-      this.vx=rnd(-1.2,1.2);this.vy=rnd(.4,1.2);
+      this.vx=rnd(-1.2,1.2)*S;this.vy=rnd(.4,1.2)*S;
       this.maxLife=rnd(10,24);
     }
     this.rot=rnd(0,TAU);this.rotV=rnd(-.045,.045);
-    this.w=rnd(9,22);this.h=rnd(5,13);
-    this.swingAmp=rnd(.6,1.4);this.swingFreq=rnd(.012,.025);this.swingOff=rnd(0,TAU);
+    this.w=rnd(9,22)*S;this.h=rnd(5,13)*S;
+    this.swingAmp=rnd(.6,1.4)*S;this.swingFreq=rnd(.012,.025);this.swingOff=rnd(0,TAU);
     this.t=0;
     const cols=['#d4a8f0','#f0b8d8','#e8a0c8','#c890e8','#f4c8e8','#b8a0e0','#fce0ff','#e0c8ff','#ffd8f0'];
     this.color=cols[Math.floor(rnd(0,cols.length))];
@@ -137,7 +140,7 @@ class FallingPetal{
     this.x+=this.vx+Math.sin(this.t*this.swingFreq*60+this.swingOff)*this.swingAmp;
     this.y+=this.vy;
     this.rot+=this.rotV;
-    if(this.burst)this.vy+=.1;
+    if(this.burst)this.vy+=.1*S;
     return this.t<this.maxLife&&this.y<H+60;
   }
   get alpha(){
@@ -145,18 +148,14 @@ class FallingPetal{
     return .8*Math.min(1,this.t/.8)*Math.min(1,(this.maxLife-this.t)/1.5);
   }
   draw(ctx){
-    const a=this.alpha;
-    if(a<.01)return;
-    ctx.save();
-    ctx.globalAlpha=a;
+    const a=this.alpha;if(a<.01)return;
+    ctx.save();ctx.globalAlpha=a;
     ctx.translate(this.x,this.y);ctx.rotate(this.rot);
     ctx.beginPath();
     ctx.moveTo(0,-this.h);
     ctx.bezierCurveTo(this.w*.65,-this.h*.6,this.w*.85,this.h*.3,0,this.h);
     ctx.bezierCurveTo(-this.w*.85,this.h*.3,-this.w*.65,-this.h*.6,0,-this.h);
-    ctx.fillStyle=this.color;
-    ctx.shadowColor=this.color;ctx.shadowBlur=7;
-    ctx.fill();
+    ctx.fillStyle=this.color;ctx.shadowColor=this.color;ctx.shadowBlur=7;ctx.fill();
     ctx.restore();
   }
 }
@@ -175,8 +174,8 @@ class Sparkle{
   constructor(){this.reset(true);}
   reset(init){
     this.x=rnd(0,W);this.y=init?rnd(0,H):rnd(H*.05,H*.9);
-    this.r=rnd(.4,3);
-    this.vx=(Math.random()-.5)*.28;this.vy=-rnd(.1,.52);
+    this.r=rnd(.4,3)*S;
+    this.vx=(Math.random()-.5)*.28*S;this.vy=-rnd(.1,.52)*S;
     this.life=0;this.maxLife=rnd(4,15);
     this.phase=rnd(0,TAU);
     const cols=['#d4a8f0','#f0c4d8','#e8b8ff','#c8a0e8','#fce4ff','#b8d0ff','#ffe8f8'];
@@ -190,7 +189,7 @@ class Sparkle{
     const prog=this.life/this.maxLife;
     const a=clamp(Math.sin(prog*PI)*(.5+.4*Math.sin(this.life*3+this.phase)),0,1);
     ctx.save();ctx.globalAlpha=a;
-    if(this.r>1.7){
+    if(this.r>1.7*S){
       ctx.save();ctx.translate(this.x,this.y);ctx.rotate(this.life*.7+this.phase);
       ctx.beginPath();
       for(let k=0;k<4;k++){
@@ -216,9 +215,9 @@ class GlowOrb{
   constructor(){this.reset();}
   reset(){
     this.x=rnd(W*.05,W*.95);this.y=rnd(H*.05,H*.9);
-    this.r=rnd(35,115);this.baseAlpha=rnd(.025,.08);
+    this.r=rnd(35,115)*S;this.baseAlpha=rnd(.025,.08);
     this.pulse=rnd(0,TAU);this.pulseSpeed=rnd(.003,.01);
-    this.dx=(Math.random()-.5)*.1;this.dy=(Math.random()-.5)*.07;
+    this.dx=(Math.random()-.5)*.1*S;this.dy=(Math.random()-.5)*.07*S;
     const hs=[265,280,300,315,255];this.hue=hs[Math.floor(rnd(0,hs.length))];
   }
   update(){
@@ -270,11 +269,25 @@ function drawLeaf(ctx,x,y,angle,size,progress){
   ctx.restore();
 }
 
-// ─── PROCEDURAL FLOWER ────────────────────────────────────────
+// ─── FLOWER CLASS ─────────────────────────────────────────────
 class Flower{
   constructor(cfg){
-    Object.assign(this,{x:0,y:0,scale:1,petalCount:6,petalLayers:2,hue:280,satLo:55,satHi:80,petalW:1,petalH:1.85,bloomDelay:0,bloomDur:2.2,breatheAmp:.025,breatheSpeed:.65,glowH:280},cfg);
+    // cfg.x, cfg.y are stored as FRACTIONS (0–1) of W/H
+    // cfg.baseScale is the design-time scale at S=1
+    Object.assign(this,{
+      fx:0.5,fy:0.42,baseScale:1,
+      petalCount:6,petalLayers:2,hue:280,satLo:55,satHi:80,
+      petalW:1,petalH:1.85,bloomDelay:0,bloomDur:2.2,
+      breatheAmp:.025,breatheSpeed:.65,glowH:280
+    },cfg);
     this.t=0;this.bloom=0;this.bloomEased=0;this.bloomed=false;this.hoverVal=0;this._hovered=false;
+    this._updatePos();
+  }
+  _updatePos(){
+    // Actual pixel position recomputed from fractions each resize
+    this.x=this.fx*W;
+    this.y=this.fy*H;
+    this.scale=this.baseScale*S;
   }
   _easeElastic(t){
     if(t<=0)return 0;if(t>=1)return 1;
@@ -296,14 +309,12 @@ class Flower{
     const sc=this.scale*this.bloomEased*breathe*(1+this.hoverVal*.06);
     ctx.scale(sc,sc);
 
-    // Under-glow
     const gr=55+this.hoverVal*28;
     const gg=ctx.createRadialGradient(0,0,0,0,0,gr);
     gg.addColorStop(0,`hsla(${this.glowH},75%,68%,${.28+this.hoverVal*.18})`);
     gg.addColorStop(1,`hsla(${this.glowH},70%,60%,0)`);
     ctx.beginPath();ctx.arc(0,0,gr,0,TAU);ctx.fillStyle=gg;ctx.fill();
 
-    // Petals: outer layers first
     for(let layer=this.petalLayers-1;layer>=0;layer--){
       const lScale=1-layer*.2;
       const pw=this.petalW*27*lScale;
@@ -316,7 +327,6 @@ class Flower{
         const hShift=this.hue+i*2.5-layer*7;
         const alpha=.84-layer*.06;
         ctx.save();ctx.rotate(ang);
-        // organic teardrop petal
         const g=ctx.createLinearGradient(0,0,0,-ph);
         g.addColorStop(0,`hsla(${hShift},${sat}%,${lit-9}%,${alpha*.9})`);
         g.addColorStop(.45,`hsla(${hShift+7},${sat+7}%,${lit+10}%,${alpha})`);
@@ -335,12 +345,10 @@ class Flower{
       }
     }
 
-    // Center disc
     const cg=ctx.createRadialGradient(0,0,0,0,0,11);
     cg.addColorStop(0,'#fff0fa');cg.addColorStop(.5,'#f5d0ec');cg.addColorStop(1,`hsla(${this.hue},60%,56%,1)`);
     ctx.beginPath();ctx.arc(0,0,11,0,TAU);ctx.fillStyle=cg;ctx.shadowColor='rgba(255,220,255,.9)';ctx.shadowBlur=14;ctx.fill();
 
-    // Pollen
     for(let p=0;p<6;p++){
       const pa=TAU/6*p+this.t*.28;const pd=7.5;
       ctx.beginPath();ctx.arc(Math.cos(pa)*pd,Math.sin(pa)*pd,1.9,0,TAU);
@@ -354,64 +362,78 @@ class Flower{
 function drawRibbon(ctx,prog){
   if(prog<=0)return;
   const cx=W*.5,by=H*.73;
+  // All offsets scaled by S
+  const rw=80*S,rh=80*S,rw2=52*S;
   ctx.save();ctx.globalAlpha=prog;
-  const wg=ctx.createLinearGradient(cx-80,by,cx+80,by+80);
+  const wg=ctx.createLinearGradient(cx-rw,by,cx+rw,by+rh);
   wg.addColorStop(0,'rgba(155,105,215,.55)');wg.addColorStop(.5,'rgba(185,138,245,.7)');wg.addColorStop(1,'rgba(145,98,208,.5)');
-  ctx.beginPath();ctx.moveTo(cx-80,by);ctx.lineTo(cx-52,by+80);ctx.lineTo(cx+52,by+80);ctx.lineTo(cx+80,by);ctx.closePath();
+  ctx.beginPath();ctx.moveTo(cx-rw,by);ctx.lineTo(cx-rw2,by+rh);ctx.lineTo(cx+rw2,by+rh);ctx.lineTo(cx+rw,by);ctx.closePath();
   ctx.fillStyle=wg;ctx.fill();
   // Bow left
-  ctx.beginPath();ctx.moveTo(cx,by+6);ctx.bezierCurveTo(cx-18,by-22,cx-68,by-18,cx-54,by+4);ctx.bezierCurveTo(cx-42,by+18,cx-6,by+12,cx,by+6);
+  ctx.beginPath();ctx.moveTo(cx,by+6*S);
+  ctx.bezierCurveTo(cx-18*S,by-22*S,cx-68*S,by-18*S,cx-54*S,by+4*S);
+  ctx.bezierCurveTo(cx-42*S,by+18*S,cx-6*S,by+12*S,cx,by+6*S);
   ctx.fillStyle='rgba(208,168,252,.82)';ctx.shadowColor='rgba(190,145,255,.4)';ctx.shadowBlur=8;ctx.fill();
   // Bow right
-  ctx.beginPath();ctx.moveTo(cx,by+6);ctx.bezierCurveTo(cx+18,by-22,cx+68,by-18,cx+54,by+4);ctx.bezierCurveTo(cx+42,by+18,cx+6,by+12,cx,by+6);
+  ctx.beginPath();ctx.moveTo(cx,by+6*S);
+  ctx.bezierCurveTo(cx+18*S,by-22*S,cx+68*S,by-18*S,cx+54*S,by+4*S);
+  ctx.bezierCurveTo(cx+42*S,by+18*S,cx+6*S,by+12*S,cx,by+6*S);
   ctx.fillStyle='rgba(208,168,252,.82)';ctx.fill();
   // Knot
-  ctx.beginPath();ctx.ellipse(cx,by+6,11,8,0,0,TAU);ctx.fillStyle='rgba(235,212,255,.96)';ctx.shadowColor='rgba(200,162,255,.7)';ctx.shadowBlur=10;ctx.fill();
+  ctx.beginPath();ctx.ellipse(cx,by+6*S,11*S,8*S,0,0,TAU);
+  ctx.fillStyle='rgba(235,212,255,.96)';ctx.shadowColor='rgba(200,162,255,.7)';ctx.shadowBlur=10;ctx.fill();
   ctx.restore();
 }
 
-// ─── FLOWER CONFIG ────────────────────────────────────────────
-let flowers=[];
+// ─── FLOWER DEFINITIONS (fx/fy = fraction of W/H) ─────────────
+// Offsets from centre expressed as fractions of a 600px reference square
+// so they scale with S automatically via _updatePos()
 function buildFlowers(){
-  const cx=W*.5,cy=H*.42;
   const defs=[
-    {x:cx,   y:cy,    scale:1.26,petalCount:7,petalLayers:3,hue:280,satLo:55,satHi:78,petalW:1.1,petalH:2.0,bloomDelay:.35,bloomDur:2.6,breatheAmp:.028,breatheSpeed:.5,glowH:280},
-    {x:cx-86,y:cy-46, scale:.96, petalCount:6,petalLayers:2,hue:330,satLo:54,satHi:74,petalW:1.0,petalH:1.9,bloomDelay:.9, bloomDur:2.2,breatheAmp:.026,breatheSpeed:.6,glowH:330},
-    {x:cx+90,y:cy-42, scale:.93, petalCount:8,petalLayers:2,hue:262,satLo:50,satHi:72,petalW:.96,petalH:1.85,bloomDelay:1.3,bloomDur:2.0,breatheAmp:.022,breatheSpeed:.65,glowH:262},
-    {x:cx-158,y:cy+10,scale:.73, petalCount:5,petalLayers:2,hue:345,satLo:48,satHi:67,petalW:.9,petalH:1.75,bloomDelay:1.7,bloomDur:1.9,breatheAmp:.03,breatheSpeed:.72,glowH:345},
-    {x:cx+158,y:cy+8, scale:.71, petalCount:6,petalLayers:2,hue:295,satLo:48,satHi:70,petalW:.88,petalH:1.72,bloomDelay:2.0,bloomDur:1.9,breatheAmp:.028,breatheSpeed:.7,glowH:295},
-    {x:cx-216,y:cy+44,scale:.56, petalCount:5,petalLayers:1,hue:320,satLo:45,satHi:64,petalW:.85,petalH:1.65,bloomDelay:2.3,bloomDur:1.7,breatheAmp:.032,breatheSpeed:.8,glowH:320},
-    {x:cx+212,y:cy+42,scale:.55, petalCount:5,petalLayers:1,hue:270,satLo:44,satHi:62,petalW:.84,petalH:1.65,bloomDelay:2.5,bloomDur:1.7,breatheAmp:.033,breatheSpeed:.78,glowH:270},
+    {fx:.5,  fy:.42,  baseScale:1.26,petalCount:7,petalLayers:3,hue:280,satLo:55,satHi:78,petalW:1.1, petalH:2.0, bloomDelay:.35,bloomDur:2.6,breatheAmp:.028,breatheSpeed:.5, glowH:280},
+    {fx:.5,  fy:.42,  ox:-86,oy:-46, baseScale:.96, petalCount:6,petalLayers:2,hue:330,satLo:54,satHi:74,petalW:1.0, petalH:1.9, bloomDelay:.9, bloomDur:2.2,breatheAmp:.026,breatheSpeed:.6, glowH:330},
+    {fx:.5,  fy:.42,  ox:90, oy:-42, baseScale:.93, petalCount:8,petalLayers:2,hue:262,satLo:50,satHi:72,petalW:.96, petalH:1.85,bloomDelay:1.3,bloomDur:2.0,breatheAmp:.022,breatheSpeed:.65,glowH:262},
+    {fx:.5,  fy:.42,  ox:-158,oy:10, baseScale:.73, petalCount:5,petalLayers:2,hue:345,satLo:48,satHi:67,petalW:.9,  petalH:1.75,bloomDelay:1.7,bloomDur:1.9,breatheAmp:.03, breatheSpeed:.72,glowH:345},
+    {fx:.5,  fy:.42,  ox:158, oy:8,  baseScale:.71, petalCount:6,petalLayers:2,hue:295,satLo:48,satHi:70,petalW:.88, petalH:1.72,bloomDelay:2.0,bloomDur:1.9,breatheAmp:.028,breatheSpeed:.7, glowH:295},
+    {fx:.5,  fy:.42,  ox:-216,oy:44, baseScale:.56, petalCount:5,petalLayers:1,hue:320,satLo:45,satHi:64,petalW:.85, petalH:1.65,bloomDelay:2.3,bloomDur:1.7,breatheAmp:.032,breatheSpeed:.8, glowH:320},
+    {fx:.5,  fy:.42,  ox:212, oy:42, baseScale:.55, petalCount:5,petalLayers:1,hue:270,satLo:44,satHi:62,petalW:.84, petalH:1.65,bloomDelay:2.5,bloomDur:1.7,breatheAmp:.033,breatheSpeed:.78,glowH:270},
   ];
-  return defs.map(cfg=>new Flower(cfg));
+  return defs.map(cfg=>{
+    const f=new Flower(cfg);
+    // Pixel position = centre + scaled offset
+    f.x = W*.5 + (cfg.ox||0)*S;
+    f.y = H*.42 + (cfg.oy||0)*S;
+    f.scale = cfg.baseScale * S;
+    return f;
+  });
 }
-flowers=buildFlowers();
+let flowers=buildFlowers();
 
-// ─── STEMS & LEAVES DATA ──────────────────────────────────────
+// ─── STEMS & LEAVES ───────────────────────────────────────────
 function getStemData(){
   const cx=W*.5,bot=H*.73;
   return[
-    {x1:cx,y1:bot,x2:cx,   y2:H*.42,    cpx1:cx-10,cpy1:H*.62,cpx2:cx+8, cpy2:H*.52,lw:3.5},
-    {x1:cx,y1:bot,x2:cx-86,y2:H*.42-.046*H,cpx1:cx-28,cpy1:H*.6,cpx2:cx-66,cpy2:H*.5,lw:2.9},
-    {x1:cx,y1:bot,x2:cx+90,y2:H*.42-.041*H,cpx1:cx+30,cpy1:H*.6,cpx2:cx+70,cpy2:H*.5,lw:2.9},
-    {x1:cx,y1:bot,x2:cx-158,y2:H*.42+.01*H, cpx1:cx-52,cpy1:H*.63,cpx2:cx-128,cpy2:H*.53,lw:2.3},
-    {x1:cx,y1:bot,x2:cx+158,y2:H*.42+.008*H,cpx1:cx+54,cpy1:H*.63,cpx2:cx+128,cpy2:H*.53,lw:2.3},
-    {x1:cx,y1:bot,x2:cx-216,y2:H*.42+.044*H,cpx1:cx-78,cpy1:H*.65,cpx2:cx-188,cpy2:H*.56,lw:1.9},
-    {x1:cx,y1:bot,x2:cx+212,y2:H*.42+.042*H,cpx1:cx+78,cpy1:H*.65,cpx2:cx+186,cpy2:H*.56,lw:1.9},
+    {x1:cx,y1:bot,x2:cx,         y2:H*.42,         cpx1:cx-10*S, cpy1:H*.62,cpx2:cx+8*S,  cpy2:H*.52,lw:3.5*S},
+    {x1:cx,y1:bot,x2:cx-86*S,    y2:H*.42-46*S,    cpx1:cx-28*S, cpy1:H*.6, cpx2:cx-66*S, cpy2:H*.5, lw:2.9*S},
+    {x1:cx,y1:bot,x2:cx+90*S,    y2:H*.42-42*S,    cpx1:cx+30*S, cpy1:H*.6, cpx2:cx+70*S, cpy2:H*.5, lw:2.9*S},
+    {x1:cx,y1:bot,x2:cx-158*S,   y2:H*.42+10*S,    cpx1:cx-52*S, cpy1:H*.63,cpx2:cx-128*S,cpy2:H*.53,lw:2.3*S},
+    {x1:cx,y1:bot,x2:cx+158*S,   y2:H*.42+8*S,     cpx1:cx+54*S, cpy1:H*.63,cpx2:cx+128*S,cpy2:H*.53,lw:2.3*S},
+    {x1:cx,y1:bot,x2:cx-216*S,   y2:H*.42+44*S,    cpx1:cx-78*S, cpy1:H*.65,cpx2:cx-188*S,cpy2:H*.56,lw:1.9*S},
+    {x1:cx,y1:bot,x2:cx+212*S,   y2:H*.42+42*S,    cpx1:cx+78*S, cpy1:H*.65,cpx2:cx+186*S,cpy2:H*.56,lw:1.9*S},
   ];
 }
 function getLeafData(){
   const cx=W*.5,bot=H*.73;
   return[
-    {x:cx-30,y:bot-H*.1, angle:-PI*.36,size:34},
-    {x:cx+24,y:bot-H*.09,angle:PI*.31,size:30},
-    {x:cx-20,y:bot-H*.17,angle:-PI*.26,size:26},
-    {x:cx+32,y:bot-H*.18,angle:PI*.21,size:22},
-    {x:cx-52,y:bot-H*.21,angle:-PI*.41,size:19},
+    {x:cx-30*S,  y:bot-H*.1,  angle:-PI*.36,size:34*S},
+    {x:cx+24*S,  y:bot-H*.09, angle:PI*.31, size:30*S},
+    {x:cx-20*S,  y:bot-H*.17, angle:-PI*.26,size:26*S},
+    {x:cx+32*S,  y:bot-H*.18, angle:PI*.21, size:22*S},
+    {x:cx-52*S,  y:bot-H*.21, angle:-PI*.41,size:19*S},
   ];
 }
 
-// ─── MOUSE / CLICK ────────────────────────────────────────────
+// ─── MOUSE ────────────────────────────────────────────────────
 let mx=W/2,my=H/2,rx=W/2,ry=H/2;
 const cursorEl=document.getElementById('cursor');
 const cursorRing=document.getElementById('cursor-ring');
@@ -430,6 +452,14 @@ document.addEventListener('click',e=>{
   flowers.forEach(f=>{if(Math.hypot(px-f.x,py-f.y)<60*f.scale&&f.bloom>.5){hit=true;burstPetals(f.x,f.y);}});
   if(!hit)burstPetals(px,py);
 });
+// Touch support
+document.addEventListener('touchstart',e=>{
+  const t=e.touches[0];
+  const px=t.clientX,py=t.clientY;
+  let hit=false;
+  flowers.forEach(f=>{if(Math.hypot(px-f.x,py-f.y)<70*f.scale&&f.bloom>.5){hit=true;burstPetals(f.x,f.y);}});
+  if(!hit)burstPetals(px,py);
+},{passive:true});
 
 // ─── MAIN LOOP ────────────────────────────────────────────────
 let startT=null,lastT=0,lastPetalTime=0;
@@ -440,17 +470,14 @@ function frame(ts){
   const gt=(ts-startT)/1000;
   const dt=clamp((ts-lastT)/1000,0,.05);lastT=ts;
 
-  // Petal canvas
   petX.clearRect(0,0,W,H);
   if(gt>lastPetalTime+.38&&petals.length<130){lastPetalTime=gt;petals.push(new FallingPetal(false));}
   for(let i=petals.length-1;i>=0;i--){if(!petals[i].update(dt))petals.splice(i,1);else petals[i].draw(petX);}
 
-  // Glow canvas
   glX.clearRect(0,0,W,H);
   sparkles.forEach(s=>{s.update(dt);s.draw(glX);});
   glowOrbs.forEach(o=>{o.update();o.draw(glX);});
 
-  // Bloom canvas
   blX.clearRect(0,0,W,H);
   const stemProg=clamp(gt-.18,0,1);
   getStemData().forEach((s,i)=>{const p=clamp((stemProg-.04*i)*1.25,0,1);drawStem(blX,s.x1,s.y1,s.x2,s.y2,s.cpx1,s.cpy1,s.cpx2,s.cpy2,p,s.lw);});
@@ -460,12 +487,10 @@ function frame(ts){
   drawRibbon(blX,ribbonProg);
   flowers.forEach(f=>{f.update(dt,gt);f.draw(blX);});
 
-  // UI
   if(gt>3.8&&!msgShown){msgShown=true;document.getElementById('msg-outer').classList.add('visible');}
   if(gt>4.5&&!hintShown){hintShown=true;document.getElementById('hint').classList.add('visible');}
   if(gt>4.1&&!ctrlShown){ctrlShown=true;document.getElementById('controls').classList.add('visible');}
 
-  // Cursor ring lag
   rx=lerp(rx,mx,.13);ry=lerp(ry,my,.13);
   cursorRing.style.left=rx+'px';cursorRing.style.top=ry+'px';
 
